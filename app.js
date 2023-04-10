@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 /* eslint-disable no-unused-vars */
 require('dotenv').config();
-
+const UAParser = require('ua-parser-js');
 const fetch = require('node-fetch');
 const path = require('path');
 const express = require('express');
@@ -36,11 +36,25 @@ const HandleLinkResolver = (doc) => {
 
 // Middleware to inject prismic context
 app.use((req, res, next) => {
-  res.locals.ctx = {
-    endpoint: process.env.PRISMIC_ENDPOINT,
-    linkResolver: HandleLinkResolver,
-  };
+  const ua = UAParser(req.headers['user-agent']);
+
+  res.locals.isDesktop = ua.device.type === undefined;
+  res.locals.isPhone = ua.device.type === 'mobile';
+  res.locals.isTablet = ua.device.type === 'tablet';
+
+  res.locals.Link = HandleLinkResolver;
   res.locals.PrismicH = PrismicH;
+  res.locals.Numbers = (index) => {
+    return index === 0
+      ? 'One'
+      : index === 1
+      ? 'Two'
+      : index === 2
+      ? 'Three'
+      : index === 3
+      ? 'Four'
+      : '';
+  };
 
   next();
 });
@@ -50,14 +64,19 @@ app.set('views', path.join(__dirname, 'views'));
 app.locals.basedir = app.get('views');
 
 const handleRequest = async (api) => {
-  const [meta, home, about, { results: collections }] = await Promise.all([
-    api.getSingle('meta'),
-    api.getSingle('home'),
-    api.getSingle('about'),
-    api.query(Prismic.Predicates.at('document.type', 'collection'), {
-      fetchLinks: 'product.image',
-    }),
-  ]);
+  const [meta, preloader, navigation, home, about, { results: collections }] =
+    await Promise.all([
+      api.getSingle('meta'),
+      api.getSingle('preloader'),
+      api.getSingle('navigation'),
+      api.getSingle('home'),
+      api.getSingle('about'),
+      api.query(Prismic.Predicates.at('document.type', 'collection'), {
+        fetchLinks: 'product.image',
+      }),
+    ]);
+
+  console.log();
 
   const assets = [];
 
@@ -69,6 +88,8 @@ const handleRequest = async (api) => {
     assets.push(item.image.url);
   });
 
+  console.log(assets);
+
   about.data.body.forEach((section) => {
     if (section.slice_type === 'gallery') {
       section.items.forEach((item) => {
@@ -78,10 +99,12 @@ const handleRequest = async (api) => {
   });
 
   collections.forEach((collection) => {
-    collection.data.products.forEach((item) => {
-      assets.push(item.products_product.data.image.url);
+    collection.data.list.forEach((item) => {
+      assets.push(item.product.data.image.url);
     });
   });
+
+  console.log(assets);
 
   return {
     assets,
@@ -89,6 +112,8 @@ const handleRequest = async (api) => {
     home,
     collections,
     about,
+    navigation,
+    preloader,
   };
 };
 

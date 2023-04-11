@@ -20,7 +20,7 @@ block content
           section.about__content__wrapper
             p.about__content__label=section.primary.label
 
-            .about__content__description=PrismicH.asHTML(section.primary.description)
+            .about__content__description!=PrismicDOM.asHTML(section.primary.description).replace(/<p>/g, '<p data-animation="paragraph">')
 
             figure.about__content__media
                 img.about__content__media__image(data-src=section.primary.image.url alt=section.primary.image.alt)
